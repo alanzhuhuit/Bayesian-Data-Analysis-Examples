@@ -10,6 +10,7 @@ output: html_document
 #try to reproduce the figure in page 70
 
 theta1 - theta2 with (theta1,2,3) draw from dirichlet distribution(728,584,138)
+this is a good example
 ```{r}
 # install.packages("tidyr")
 library(ggplot2)
