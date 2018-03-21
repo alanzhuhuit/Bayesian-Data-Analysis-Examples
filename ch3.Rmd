@@ -1,0 +1,123 @@
+---
+title: "bda practice ch3"
+author: "xiaozhi zhu"
+date: "March 2, 2018"
+output: html_document
+---
+
+
+## practice in chapter 3
+#try to reproduce the figure in page 70
+
+theta1 - theta2 with (theta1,2,3) draw from dirichlet distribution(728,584,138)
+```{r}
+# install.packages("tidyr")
+library(ggplot2)
+library(gridExtra)
+library(tidyr)
+#install.packages("DirichletReg")
+library(DirichletReg)
+raw = rdirichlet(10000,c(728,584,138))
+nlen = length(raw[,1])
+diff = c();
+for(i in 1:nlen){
+  diff = c(diff,raw[i,1]-raw[i,2])
+}
+hist(diff, nclass=50)
+```
+
+
+# 3.7 example
+```{r}
+rm(list = ls())
+#inputing
+bioa.data <- data.frame(rep(c(-0.86,-0.3,-0.05,0.73),2),
+                        c(0,1,3,5,5,4,2,0),
+                        c(rep(1,4),rep(0,4)))
+colnames(bioa.data) = c('dose','count','positive')
+# bioa.data$dose = exp(bioa.data$dose)
+
+# bioa.data
+# preliminary glm
+bioa.rawfit = glm(positive ~ dose, weights = count, data = bioa.data,family = binomial)
+summary(bioa.rawfit)
+# plotting
+xweight <- seq(-3, 3, 0.05)
+yweight <- predict(bioa.rawfit, list(dose = xweight),type="response")
+plot(xweight, yweight,'l')
+```
+
+define the log likelihood function
+```{r}
+df1 <- data.frame(
+  x = c(-0.86, -0.30, -0.05, 0.73),
+  n = c(5, 5, 5, 5),
+  y = c(0, 1, 3, 5)
+)
+logl = function(rdata, alpha, beta)
+  rdata['y'] * (alpha + beta * rdata['x']) - rdata['n'] * log1p(exp(alpha + beta*rdata['x']))
+```
+
+creat grid
+```{r}
+A = seq(-4, 8, length.out = 50)
+B = seq(-10, 40, length.out = 50)
+cA <- rep(A, each = length(B))
+cB <- rep(B, length(A))
+```
+
+calculate likelihoods
+```{r}
+p <- apply(df1, 1, logl, cA, cB) %>%
+  # sum the log likelihoods of observations
+  # and exponentiate to get the joint likelihood
+  rowSums() %>% exp()
+```
+
+```{r}
+nsamp <- 1000
+samp_indices <- sample(length(p), size = nsamp,
+                       replace = T, prob = p/sum(p))
+samp_A <- cA[samp_indices[1:nsamp]]
+samp_B <- cB[samp_indices[1:nsamp]]
+```
+
+
+```{r}
+samp_A <- samp_A + runif(nsamp, (A[1] - A[2])/2, (A[2] - A[1])/2)
+samp_B <- samp_B + runif(nsamp, (B[1] - B[2])/2, (B[2] - B[1])/2)
+```
+
+```{r}
+bpi <- samp_B > 0
+samp_ld50 <- -samp_A[bpi]/samp_B[bpi]
+# limits for the plots
+xl <- c(-2, 8)
+yl <- c(-2, 40)
+ggplot(data = data.frame(cA ,cB, p), aes(cA, cB)) +
+  geom_raster(aes(fill = p, alpha = p), interpolate = T) +
+  geom_contour(aes(z = p), colour = 'black', size = 0.2) +
+  coord_cartesian(xlim = xl, ylim = yl) +
+  labs(x = 'alpha', y = 'beta') +
+  scale_fill_gradient(low = 'yellow', high = 'red', guide = F) +
+  scale_alpha(range = c(0, 1), guide = F)
+```
+
+
+```{r}
+ggplot(data = data.frame(samp_A, samp_B)) +
+  geom_point(aes(samp_A, samp_B), color = 'blue') +
+  coord_cartesian(xlim = xl, ylim = yl) +
+  labs(x = 'alpha', y = 'beta')
+```
+
+```{r}
+ggplot() +
+  geom_histogram(aes(samp_ld50), binwidth = 0.02,
+                 fill = 'steelblue', color = 'black') +
+  coord_cartesian(xlim = c(-0.5, 0.5)) +
+  labs(x = 'LD50 = -alpha/beta')
+```
+
+
+
